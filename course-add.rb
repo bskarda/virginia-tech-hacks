@@ -7,13 +7,14 @@ require 'stringio'
 
 #Change based on Semester
 $term = '09'
-$year = '2012'
+$year = '2013'
 $frequency = 4  #Number of Seconds between check requests
 
 $agent = Mechanize.new
 $agent.redirect_ok = true 
 $agent.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.11 Safari/535.19"
 $agent.verify_mode = OpenSSL::SSL::VERIFY_NONE
+HighLine.track_eof = false #Added to fix ruby compiled with --enable-pthread
 
 #Uber simway to colorize outputin
 class String
@@ -34,6 +35,10 @@ end
 
 #Logins, Gets the Courses, Returns Courses Obj with Name/URL/Tools for each
 def login(username, password)
+	#TODO current fix is to login to auth.vt.edu before running script
+	#TODO Logout before attempting to login
+	# or check to see if line = Login Successful
+	# then return true
 
 	#Login to the system!
 	page = $agent.get("https://auth.vt.edu/login?service=https://webapps.banner.vt.edu/banner-cas-prod/authorized/banner/SelfService")
@@ -66,7 +71,11 @@ def getCourse(crn)
 	course[:title] = courseDetails.css('td.title').last.text.gsub(/-\ +/, '')
 	course[:crn] = crn
 
-	courseDetails.css('table table tr').each_with_index do |row|
+	#puts "course details table table tr"
+	#puts courseDetails.css('table table tr')
+	#puts ""
+	#puts ""
+	courseDetails.css('table table tr').each do |row|
 		#If we have a dataSet
 		case dataSet
 			when :rowA
@@ -77,6 +86,14 @@ def getCourse(crn)
 				end
 			when :rowB
 				[ :instructor, :type, :status, :seats, :capacity ].each_with_index do |el, i|
+					#puts "one entry = "
+					#puts row
+					#puts "td row = "
+					#puts row.css('td')
+					#puts "td row text ="
+					#puts row.css('td').text
+					#puts "td row text index ="
+					#puts row.css('td')[i].text
 					course[el] = row.css('td')[i].text
 				end
 		end
@@ -135,17 +152,16 @@ def checkCourses(courses)
 		puts "--------------------------------\n\n"
 
 		courses.each_with_index do |c, i|
-
-			puts "#{c[:crn]} - #{c[:title]}".color(:blue) 
-			course = getCourse(c[:crn])	
+			puts "#{c} #{i}".color(:blue)
+			course = getCourse(c)	
 			next unless course #If throws error
 
 			puts "Availaibility: #{course[:seats]} / #{course[:capacity]}".color(:red)
 
 			if (course[:seats] =~ /Full/) then
 			else 
-				if (registerCrn(c[:crn])) then
-					puts "CRN #{c[:crn]} Registration Sucessfull"
+				if (registerCrn(c)) then
+					puts "CRN #{c} Registration Sucessfull"
 					courses.slice!(i)
 
 				else
@@ -164,12 +180,11 @@ end
 #Add courses to be checked
 def addCourses 
 	crns = []
-
 	loop do 
-		system("clear")
+		#system("clear")
 		puts "Your CRNs:".color(:red)
 		crns.each do |crn|
-			puts "  -> #{crn[:title]} (CRN: #{crn[:crn]})".color(:magenta)
+			puts "  -> (CRN: #{crn})".color(:magenta)
 		end
 
 		#Prompt for CRN
